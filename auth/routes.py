@@ -1,8 +1,11 @@
+import os
 from flask import Blueprint, request, jsonify, current_app
 import jwt
 import bcrypt
 from functools import wraps
 from .token import sign_access_token, sign_refresh_token, decode_token
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 import redis
 import json
 import traceback
@@ -48,7 +51,7 @@ def register():
         salt = bcrypt.gensalt(rounds=12)
         encrypted_password = bcrypt.hashpw(password.encode('utf-8'), salt)
     
-        if redis_client.exists(f"user:{username}"):
+        if redis_client.exists(f"user:{email}"):
             return jsonify({'message': 'User already exists!'}), 400
     
         new_user = {
@@ -58,15 +61,11 @@ def register():
             "region": str(region)
         }
     
-        access_token = sign_access_token(username)
-        refresh_token = sign_refresh_token(username)
+        access_token = sign_access_token(user=new_user)
+        refresh_token = sign_refresh_token(user=new_user)
 
-        # Generate both access and refresh tokens
-        access_token = sign_access_token(username)
-        refresh_token = sign_refresh_token(username)
-
-        redis_client.set(f"user:{username}", json.dumps(new_user))
-        redis_client.set(f"refresh_token:{username}", refresh_token, ex=60 * 60 * 24 * 7)
+        redis_client.set(f"user:{email}", json.dumps(new_user))
+        redis_client.set(f"refresh_token:{email}", refresh_token, ex=60 * 60 * 24 * 7)
 
         return jsonify({
             'user': new_user,
@@ -90,11 +89,11 @@ def login():
     try:
         # Get user credentials from the request
         data = request.json
-        username = data.get('username')
+        email = data.get('email')
         password = data.get('password')
 
         # Check if the user exists in Redis
-        user_data = redis_client.get(f"user:{username}")
+        user_data = redis_client.get(f"user:{email}")
         if not user_data:
             return jsonify({'message': 'User does not exist!'}), 404
 
@@ -107,11 +106,11 @@ def login():
             return jsonify({'message': 'Invalid credentials!'}), 401
 
         # Generate access and refresh tokens
-        access_token = sign_access_token(username)
-        refresh_token = sign_refresh_token(username)
+        access_token = sign_access_token(user=user)
+        refresh_token = sign_refresh_token(user=user)
 
         # Store refresh token in Redis with a 7-day expiration
-        redis_client.set(f"refresh_token:{username}", refresh_token, ex=60 * 60 * 24 * 7)
+        redis_client.set(f"refresh_token:{email}", refresh_token, ex=60 * 60 * 24 * 7)
 
         # Return tokens and user info
         return jsonify({
@@ -147,7 +146,7 @@ def refresh_token():
             return jsonify({'message': 'Refresh token is missing!'}), 400
 
         # Decode the refresh token to get the username
-        decoded_refresh_token = jwt.decode(refresh_token, current_app.config['REFRESH_SECRET_KEY'], algorithms=["HS256"])
+        decoded_refresh_token = jwt.decode(refresh_token, current_app.config['JWT_SECRET'], algorithms=["HS256"])
         username = decoded_refresh_token['user']
 
         # Check if the stored refresh token in Redis matches the provided token
@@ -173,6 +172,60 @@ def refresh_token():
 
 
 
+@auth_bp.route('/google', methods=['POST'])
+def googleAuth():
+    try:
+        GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT')
+        data = request.json
+        token = data.get('token')
+        if not token:
+            return jsonify({"message": "Token is missing!"}), 400
+        # Verify the token using Google's API
+        try:
+            id_info = id_token.verify_oauth2_token(token, google_requests.Request(), GOOGLE_CLIENT_ID)
+        except ValueError:
+            return jsonify({"message": "Invalid token!"}), 400
+        
+        
+        google_user_id = id_info['sub']  # Unique ID for the Google user
+        email = id_info['email']
+        full_name = id_info['name']
+        profile_picture = id_info.get('picture')
+        
+        # new_user = {
+        #     'username': full_name,
+        #     'email': email,
+        #     'auth': 'google'
+        # }
+        new_user = {
+            "google_user_id": google_user_id,
+            "email": email,
+            "username": full_name,
+            "profile_picture": profile_picture
+        }
+        user_data = redis_client.get(f"user:{email}")
+
+        if not user_data:
+            # User doesn't exist, create a new entry
+            redis_client.set(f"user:{email}", json.dumps(new_user))
+        else:
+            # User exists, deserialize the user data
+            new_user = json.loads(user_data)
+        
+        access_token = sign_access_token(user=new_user)
+        refresh_token = sign_refresh_token(user=new_user)
+        redis_client.set(f"refresh_token:{email}", refresh_token, ex=60 * 60 * 24 * 7)
+        
+        return jsonify({
+            'user': new_user,
+            'access_token': access_token
+        }),201 
+    except Exception as e:
+        traceback.print_exc()
+        return json({
+            'message':str(e)
+        }), 500
+        
 
 
 # Example protected route
