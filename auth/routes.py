@@ -5,10 +5,11 @@ import bcrypt
 from functools import wraps
 from .token import sign_access_token, sign_refresh_token, decode_token
 from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
+from google.auth.transport import requests
 import redis
 import json
 import traceback
+
 
 auth_bp = Blueprint('auth', __name__)
 redis_client = redis.Redis(host='localhost',port=6379, db=0)
@@ -175,16 +176,18 @@ def refresh_token():
 @auth_bp.route('/google', methods=['POST'])
 def googleAuth():
     try:
-        GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT')
+        GOOGLE_CLIENT_ID = '229084646214-h4envqms90napi5k6os5r4u4us4f3j8o.apps.googleusercontent.com'
         data = request.json
         token = data.get('token')
+        print(token)
         if not token:
             return jsonify({"message": "Token is missing!"}), 400
         # Verify the token using Google's API
+        
         try:
-            id_info = id_token.verify_oauth2_token(token, google_requests.Request(), GOOGLE_CLIENT_ID)
+            id_info = id_token.verify_oauth2_token(token,  requests.Request(), GOOGLE_CLIENT_ID)
         except ValueError:
-            return jsonify({"message": "Invalid token!"}), 400
+            return jsonify({ "message": "Invalid token!"}), 400
         
         
         google_user_id = id_info['sub']  # Unique ID for the Google user
@@ -217,12 +220,12 @@ def googleAuth():
         redis_client.set(f"refresh_token:{email}", refresh_token, ex=60 * 60 * 24 * 7)
         
         return jsonify({
-            'user': new_user,
-            'access_token': access_token
+           'user':new_user,
+           'access_token':access_token
         }),201 
     except Exception as e:
         traceback.print_exc()
-        return json({
+        return jsonify({
             'message':str(e)
         }), 500
         
