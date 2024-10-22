@@ -2,9 +2,10 @@ from flask import Blueprint, request, jsonify, current_app
 import jwt
 import bcrypt
 from functools import wraps
-from .token import generate_access_token, generate_refresh_token, decode_token
+from .token import sign_access_token, sign_refresh_token, decode_token
 import redis
 import json
+import traceback
 
 auth_bp = Blueprint('auth', __name__)
 redis_client = redis.Redis(host='localhost',port=6379, db=0)
@@ -44,27 +45,27 @@ def register():
         password = data.get('password')
         region = data.get('region')
 
-        salt = bcrypt.gensalt(rounds=2)
-        encrypted_password = bcrypt.hashpw(password=password, salt=salt)
+        salt = bcrypt.gensalt(rounds=12)
+        encrypted_password = bcrypt.hashpw(password.encode('utf-8'), salt)
     
         if redis_client.exists(f"user:{username}"):
             return jsonify({'message': 'User already exists!'}), 400
     
         new_user = {
-            "username": username,
-            "password": encrypted_password,
-            "email": email,
-            "region": region
+            "username": str(username),
+            "password": str(encrypted_password.decode('utf-8')),
+            "email": str(email),
+            "region": str(region)
         }
     
-        redis_client.set(f"user:{username}", json.dumps(new_user))
-        access_token = generate_access_token(username)
-        refresh_token = generate_refresh_token(username)
+        access_token = sign_access_token(username)
+        refresh_token = sign_refresh_token(username)
 
         # Generate both access and refresh tokens
-        access_token = generate_access_token(username)
-        refresh_token = generate_refresh_token(username)
+        access_token = sign_access_token(username)
+        refresh_token = sign_refresh_token(username)
 
+        redis_client.set(f"user:{username}", json.dumps(new_user))
         redis_client.set(f"refresh_token:{username}", refresh_token, ex=60 * 60 * 24 * 7)
 
         return jsonify({
@@ -73,6 +74,8 @@ def register():
             'refresh_token': refresh_token
         }), 201
     except Exception as e:
+        traceback.print_exc()
+        
         return jsonify({
             'message': str(e),
         }), 500
@@ -97,14 +100,15 @@ def login():
 
         # Deserialize the user data from Redis
         user = json.loads(user_data)
+        bcrypt.gensalt(rounds=12)
+        hashed_password = user['password'].encode('utf-8')
 
-        # Check if the password matches the stored (hashed) password
-        if not bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
+        if not bcrypt.checkpw(password.encode('utf-8'), hashed_password):
             return jsonify({'message': 'Invalid credentials!'}), 401
 
         # Generate access and refresh tokens
-        access_token = generate_access_token(username)
-        refresh_token = generate_refresh_token(username)
+        access_token = sign_access_token(username)
+        refresh_token = sign_refresh_token(username)
 
         # Store refresh token in Redis with a 7-day expiration
         redis_client.set(f"refresh_token:{username}", refresh_token, ex=60 * 60 * 24 * 7)
@@ -121,6 +125,8 @@ def login():
         }), 200
 
     except Exception as e:
+        print(e)
+        traceback.print_exc()
         return jsonify({
             'message': str(e)
         }), 500
@@ -150,7 +156,7 @@ def refresh_token():
             return jsonify({'message': 'Invalid refresh token!'}), 403
 
         # Generate a new access token
-        new_access_token = generate_access_token(username)
+        new_access_token = sign_access_token(username)
 
         return jsonify({
             'access_token': new_access_token
