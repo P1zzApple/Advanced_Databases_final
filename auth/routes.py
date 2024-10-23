@@ -13,7 +13,7 @@ import traceback
 
 auth_bp = Blueprint('auth', __name__)
 redis_client = redis.Redis(host='localhost',port=6379, db=0)
-
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT')
 # Decorator to protect routes with JWT token
 def token_required(f):
     @wraps(f)
@@ -176,7 +176,7 @@ def refresh_token():
 @auth_bp.route('/google', methods=['POST'])
 def googleAuth():
     try:
-        GOOGLE_CLIENT_ID = '229084646214-h4envqms90napi5k6os5r4u4us4f3j8o.apps.googleusercontent.com'
+
         data = request.json
         token = data.get('token')
         print(token)
