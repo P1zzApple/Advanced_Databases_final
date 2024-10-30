@@ -5,6 +5,7 @@ import jwt
 import datetime
 from functools import wraps
 from auth.routes import auth_bp
+from order.routes import order_bp
 from categories import categories_bp
 from dotenv import load_dotenv
 from flask_cors import CORS
@@ -18,8 +19,10 @@ CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "https://your-
 redis_client = redis.Redis(host='localhost', port=6379, db=0)
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(categories_bp, url_prefix='/api/categories')
+app.register_blueprint(order_bp, url_prefix='/api/orders')
 # Secret key to encode and decode JWT
 app.config['JWT_SECRET'] =  os.getenv('JWT_SECRET')
+app.config['STRIPE_KEY'] = os.getenv('STRIPE_KEY')
 app.config['JWT_TOKEN_LOCATION'] = ['headers']
 
 
