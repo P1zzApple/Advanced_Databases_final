@@ -106,7 +106,6 @@ def get_all_categories():
                         "category_id": key.split(":")[1],  # Extract category ID
                         "name": category_data.get(b'name').decode('utf-8'),  # Decode category name
                         "subcategories": get_subcat(key.split(":")[1])
-                        
                     }
                     categories.append(category)
             
