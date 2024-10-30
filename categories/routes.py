@@ -28,30 +28,96 @@ def create_category():
         return jsonify({'message': str(e)}), 500
 
 
-# READ all categories (public route)
+
+
+def get_subcat(category_id):
+    try:
+        category_key = f"category:{category_id}"
+        category_data = redis_client.hgetall(category_key)
+
+        if not category_data:
+            raise ValueError("Category not found!")
+
+        # Retrieve subcategory IDs
+        subcategory_ids = redis_client.smembers(f"{category_key}:subcategories")
+        subcategories = []
+
+        for subcategory_id in subcategory_ids:
+            subcategory_data = redis_client.hgetall(f"subcategory:{subcategory_id.decode('utf-8')}")
+            if subcategory_data:
+                subcategories.append({
+                    "subcategory_id": subcategory_id.decode('utf-8'),  # Decode to string
+                    "name": subcategory_data.get(b'name').decode('utf-8')  # Decode to string
+                })
+
+        return subcategories
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return []
+
+
+
+
+
+@categories_bp.route('/<category_id>', methods=['GET'])
+def get_category_with_subcategories(category_id):
+    try:
+        category_key = f"category:{category_id}"
+        category_data = redis_client.hgetall(category_key)
+
+        if not category_data:
+            return jsonify({'message': 'Category not found!'}), 404
+
+        # Retrieve subcategory IDs
+        subcategory_ids = redis_client.smembers(f"{category_key}:subcategories")
+        subcategories = []
+
+        for subcategory_id in subcategory_ids:
+            subcategory_data = redis_client.hgetall(f"subcategory:{subcategory_id.decode('utf-8')}")
+            if subcategory_data:
+                subcategories.append({
+                    "subcategory_id": subcategory_id.decode('utf-8'),  # Decode to string
+                    "name": subcategory_data.get(b'name').decode('utf-8')  # Decode to string
+                })
+
+        response = {
+            "category_id": category_id,
+            "name": category_data.get(b'name').decode('utf-8'),
+            "subcategories": subcategories
+        }
+
+        return jsonify(response), 200
+
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+
+
+
 @categories_bp.route('/', methods=['GET'])
 def get_all_categories():
     try:
         categories = []
-        keys = redis_client.keys('category:*')
+        keys = redis_client.keys('category:*')  # Get all keys that start with 'category:'
         decoded_keys = [key.decode('utf-8') for key in keys]  # Decode from bytes to strings
 
-        print(decoded_keys)
+        # Filter to include only main category keys
         for key in decoded_keys:
-            # Fetch all fields and values from the Redis hash
-            category_data = redis_client.hgetall(key)
-            print(category_data)
-            if category_data:
-                category = {
-                    "category_id": key.split(":")[1],  # Extract category_id from the key
-                    "name": category_data.get(b'name').decode('utf-8')  # Decode from bytes to a regular string
-                }
-                categories.append(category)
-
+            if not key.endswith(':subcategories'):  # Only include keys that are not subcategory keys
+                category_data = redis_client.hgetall(key)
+                if category_data:
+                    category = {
+                        "category_id": key.split(":")[1],  # Extract category ID
+                        "name": category_data.get(b'name').decode('utf-8'),  # Decode category name
+                        "subcategories": get_subcat(key.split(":")[1])
+                        
+                    }
+                    categories.append(category)
+            
+                
         return jsonify(categories), 200
 
     except Exception as e:
-        # traceback.print_exc(e)
         return jsonify({'message': str(e)}), 500
 
 
