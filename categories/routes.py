@@ -7,6 +7,7 @@ import traceback
 # Redis connection
 redis_client = redis.Redis(host='localhost', port=6379, db=0)
 
+
 # CREATE a new category (public route)
 @categories_bp.route('/create', methods=['POST'])
 def create_category():
@@ -26,7 +27,6 @@ def create_category():
 
     except Exception as e:
         return jsonify({'message': str(e)}), 500
-
 
 
 
@@ -55,9 +55,6 @@ def get_subcat(category_id):
     except Exception as e:
         print(f"Error: {e}")
         return []
-
-
-
 
 
 @categories_bp.route('/<category_id>', methods=['GET'])
@@ -91,7 +88,6 @@ def get_category_with_subcategories(category_id):
 
     except Exception as e:
         return jsonify({'message': str(e)}), 500
-
 
 
 @categories_bp.route('/', methods=['GET'])
