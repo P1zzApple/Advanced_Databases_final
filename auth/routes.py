@@ -10,11 +10,12 @@ import redis
 import json
 import traceback
 
-
 auth_bp = Blueprint('auth', __name__)
 redis_client = redis.Redis(host='localhost',port=6379, db=0)
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT')
 # Decorator to protect routes with JWT token
+
+
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -24,14 +25,13 @@ def token_required(f):
 
         try:
             token = token.split(" ")[1]  # Extract the token part from "Bearer <token>"
-            data = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=["HS256"])
-            current_user = data['user']
-        except jwt.ExpiredSignatureError:
-            return jsonify({"message": "Token has expired!"}), 403
-        except jwt.InvalidTokenError:
-            return jsonify({"message": "Invalid token!"}), 403
+            current_user = decode_token(token)  # Use the decode_token function to decode JWT
+            if not current_user:
+                return jsonify({"message": "Invalid or expired token!"}), 403
+        except Exception as e:
+            return jsonify({"message": str(e)}), 500
 
-        return f(current_user, *args, **kwargs)
+        return f(current_user, *args, **kwargs)  # Pass current_user to the route
 
     return decorated
 
@@ -115,11 +115,11 @@ def login():
 
         # Return tokens and user info
         return jsonify({
-            'user': {
-                'username': user['username'],
-                'email': user['email'],
-                'region': user['region']
-            },
+                'user': {
+                    'username': user['username'],
+                    'email': user['email'],
+                    'region': user['region']
+                },
             'access_token': access_token,
             'refresh_token': refresh_token
         }), 200
@@ -232,10 +232,11 @@ def googleAuth():
 
 
 # Example protected route
-@auth_bp.route('/protected', methods=['GET'])
+@auth_bp.route('/getme', methods=['GET'])
 @token_required
 def protected_route(user):
     """
     A protected route that requires a valid access token.
     """
-    return jsonify({'message': f'Welcome, {user}! This is a protected route.'})
+    return jsonify({'user': user})
+
