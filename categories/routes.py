@@ -4,6 +4,7 @@ from flask import jsonify, request
 from . import categories_bp
 from auth.routes import token_required
 import traceback
+from .engine import output,recommend
 
 
 # Redis connection
@@ -276,3 +277,39 @@ def store_user_preferences(user):
     except Exception as e:
         print(f"Error saving preferences: {e}")
         return jsonify({'message': 'An error occurred while saving preferences.'}), 500
+
+
+
+@categories_bp.route('/recommendations', methods=['GET'])
+@token_required
+def get_recommendations(user):
+    user_email = user["email"]
+
+    try:
+        # Retrieve user preferences from Redis
+        user_preferences_key = f"user:{user_email}:preferences"
+        liked_product_id = redis_client.hget(user_preferences_key, "liked_product")
+        liked_product_tags_json = redis_client.hget(user_preferences_key, "liked_product_tags")
+
+        if not liked_product_id or not liked_product_tags_json:
+            return jsonify({'message': 'No liked products found for this user.'}), 404
+
+        # Decode the liked product tags from JSON
+        liked_product_tags = json.loads(liked_product_tags_json)
+
+        # Fetch similar products based on the liked tags
+        similar_products = recommend(liked_product_tags)
+
+        # Prepare the response
+        if not similar_products:
+            return jsonify({'message': 'No recommendations found based on your preferences.'}), 404
+        
+        # Get details for recommended products
+        recommended_product_details = output(similar_products)
+
+        return jsonify({'products':recommended_product_details}), 200
+
+    except Exception as e:
+        print(f"Error retrieving recommendations: {e}")
+        traceback.print_exc(e)
+        return jsonify({'message': 'An error occurred while retrieving recommendations.'}), 500
