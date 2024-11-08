@@ -5,7 +5,7 @@ from . import categories_bp
 import traceback
 
 # Redis connection
-redis_client = redis.Redis(host='localhost', port=6379, db=0)
+redis_client = redis.Redis(host='redis-17786.c232.us-east-1-2.ec2.redns.redis-cloud.com', port=17786, password='qaA9XpXI5NdIuHWrcluse37dzG0Ose7F')
 
 
 # CREATE a new category (public route)
