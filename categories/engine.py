@@ -1,40 +1,42 @@
 import redis as r
-# from likes
+import json
 
-r = r.Redis(
-  host='redis-17786.c232.us-east-1-2.ec2.redns.redis-cloud.com',
-  port=17786,
-  password='qaA9XpXI5NdIuHWrcluse37dzG0Ose7F')
+# Connect to Redis
+r = r.Redis(host='localhost', port=6379, db=0)
 
 print('Waiting for connection...')
 r.set('test_key', b'Connection successful')
 print(r.get('test_key'))
 
 mac = ["Apple", "Laptop", "M1-Pro", "MacBook"]  # for test purposes
-product_ahh = r.keys('product:*')
-
+product_keys = r.keys('product:*')  # Retrieve product keys from Redis
 
 def recommend(tags):
     similar = []
-    for ahh in product_ahh:
-        other_tags = r.hget(ahh, b'tags').decode('utf-8')
-        if [item for item in tags if item in other_tags]:
-            p_id = ahh.decode('utf-8')
-            similar.append(p_id)
-            #print(r.hgetall(ahh.decode('utf-8')))
+    for product_key in product_keys:
+        # Decode the product key from bytes to string
+        product_key_str = product_key.decode('utf-8')
+        
+        # Get the tags for each product and decode them from bytes
+        other_tags = json.loads(r.hget(product_key, b'tags').decode('utf-8'))
+        
+        # Check for intersection with the provided tags
+        if any(item in other_tags for item in tags):
+            similar.append(product_key_str)
     return similar
 
-
 def output(outputs):
-    all_products_data = {}
+    all_products_data = []  # Change from dict to list
     for output in outputs:
-        all_products_data[output] = {}
         p_data = r.hgetall(output)
+        product_info = {}
         for key, value in p_data.items():
-             all_products_data[output][key] = value.decode('utf-8')
+            product_info[key.decode('utf-8')] = value.decode('utf-8')  # Decode keys and values
+        all_products_data.append(product_info)  # Append product info to the list
     return all_products_data
 
-
 macdac = recommend(mac)
-#print(macdac)
-print(output(macdac))
+recommended_products = output(macdac)  # Get the detailed information of recommended products
+
+# Output the recommendations as a JSON object
+print(json.dumps(recommended_products, indent=4))  # Pretty-print the JSON output
