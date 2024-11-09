@@ -4,11 +4,11 @@ from flask import jsonify, request
 from . import categories_bp
 from auth.routes import token_required
 import traceback
-from .engine import output,recommend
+from .engine import output, recommend
 
 
 # Redis connection
-redis_client = redis.Redis(host='localhost', port=6379, db=0)
+redis_client = redis.Redis(host='redis-17786.c232.us-east-1-2.ec2.redns.redis-cloud.com', port=17786, password='qaA9XpXI5NdIuHWrcluse37dzG0Ose7F')
 
 
 # CREATE a new category (public route)
@@ -210,8 +210,7 @@ def get_products_by_category(category_id):
                         "price": float(product_data.get(b'price')),
                         "stock_quantity": int(product_data.get(b'stock_quantity')),
                         "ratings": float(product_data.get(b'ratings')),
-                        "tags": json.loads(product_data.get(b'tags').decode('utf-8')),
-                        "images": json.loads(product_data.get(b'images').decode('utf-8')),
+                        "tags": json.loads(product_data.get(b'tags').decode('utf-8'))
                     }
                     products.append(product)
 
