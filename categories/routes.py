@@ -4,7 +4,7 @@ from flask import jsonify, request
 from . import categories_bp
 from auth.routes import token_required
 import traceback
-from .engine import output,recommend
+from .engine import output, recommend
 
 
 # Redis connection
@@ -210,8 +210,7 @@ def get_products_by_category(category_id):
                         "price": float(product_data.get(b'price')),
                         "stock_quantity": int(product_data.get(b'stock_quantity')),
                         "ratings": float(product_data.get(b'ratings')),
-                        "tags": json.loads(product_data.get(b'tags').decode('utf-8')),
-                        "images": json.loads(product_data.get(b'images').decode('utf-8')),
+                        "tags": json.loads(product_data.get(b'tags').decode('utf-8'))
                     }
                     products.append(product)
 

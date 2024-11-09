@@ -1,8 +1,8 @@
-import redis as r
+import redis
 import json
 
 # Connect to Redis
-r = r.Redis(host='localhost', port=6379, db=0)
+r = redis.Redis(host='redis-17786.c232.us-east-1-2.ec2.redns.redis-cloud.com', port=17786, password='qaA9XpXI5NdIuHWrcluse37dzG0Ose7F')
 
 print('Waiting for connection...')
 r.set('test_key', b'Connection successful')
